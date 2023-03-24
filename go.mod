@@ -50,6 +50,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v3 v3.0.1
 	howett.net/plist v1.0.0
+	modernc.org/sqlite v1.21.0
 	mvdan.cc/sh/v3 v3.6.0
 )
 
@@ -138,7 +139,6 @@ require (
 	modernc.org/mathutil v1.5.0 // indirect
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/opt v0.1.3 // indirect
-	modernc.org/sqlite v1.21.0 // indirect
 	modernc.org/strutil v1.1.3 // indirect
 	modernc.org/token v1.0.1 // indirect
 )
