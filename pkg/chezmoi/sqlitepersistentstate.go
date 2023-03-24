@@ -9,38 +9,30 @@ import (
 
 const (
 	createSchemaQuery = `
-		BEGIN TRANSACTION;
-		CREATE TABLE IF NOT EXISTS buckets (
-			id BLOB PRIMARY KEY
-		);
-		CREATE TABLE IF NOT EXISTS pairs (
-			bucket_id BLOB REFERENCES buckets (id) ON DELETE CASCADE,
+		CREATE TABLE IF NOT EXISTS state (
+			bucket BLOB NOT NULL,
 			key BLOB NOT NULL,
 			value BLOB NOT NULL,
-			PRIMARY KEY (bucket_id, key)
+			PRIMARY KEY (bucket, key)
 		);
-		END TRANSACTION;
 	`
 	dataQuery = `
-		SELECT bucket_id AS bucket, key, value FROM pairs;
+		SELECT bucket, key, value FROM state;
 	`
 	deleteQuery = `
-		DELETE FROM pairs WHERE bucket_id = $1 AND key = $2;
+		DELETE FROM state WHERE bucket = $1 AND key = $2;
 	`
 	deleteBucketQuery = `
-		DELETE FROM buckets WHERE id = $1;
+		DELETE FROM state WHERE bucket = $1;
 	`
 	forEachQuery = `
-		SELECT key, value FROM pairs WHERE bucket_id = $1;
+		SELECT key, value FROM state WHERE bucket = $1;
 	`
 	getQuery = `
-		SELECT value FROM pairs WHERE bucket_id = $1 AND key = $2;
+		SELECT value FROM state WHERE bucket = $1 AND key = $2;
 	`
 	setQuery = `
-		BEGIN TRANSACTION;
-		INSERT OR IGNORE INTO buckets (id) VALUES ($1);
-		INSERT OR REPLACE INTO pairs (bucket_id, key, value) VALUES ($1, $2, $3);
-		END TRANSACTION;
+		INSERT OR REPLACE INTO state (bucket, key, value) VALUES ($1, $2, $3);
 	`
 )
 
@@ -72,19 +64,19 @@ func (s *SQLitePersistentState) CopyTo(other PersistentState) error {
 }
 
 func (s *SQLitePersistentState) Data() (any, error) {
-	dataMap := make(map[string]map[string]string)
+	data := make(map[string]map[string]string)
 	if err := s.forAll(func(bucket, key, value []byte) error {
-		bucketMap, ok := dataMap[string(bucket)]
+		bucketMap, ok := data[string(bucket)]
 		if !ok {
 			bucketMap = make(map[string]string)
-			dataMap[string(bucket)] = bucketMap
+			data[string(bucket)] = bucketMap
 		}
 		bucketMap[string(key)] = string(value)
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	return dataMap, nil
+	return data, nil
 }
 
 func (s *SQLitePersistentState) Delete(bucket, key []byte) error {
