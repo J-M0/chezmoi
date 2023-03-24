@@ -66,24 +66,25 @@ func (s *SQLitePersistentState) Close() error {
 }
 
 func (s *SQLitePersistentState) CopyTo(other PersistentState) error {
-	rows, err := s.db.Query(dataQuery)
-	if err != nil {
-		return err
-	}
-	for rows.Next() {
-		var bucket, key, value []byte
-		if err := rows.Scan(&bucket, &key, &value); err != nil {
-			return err
-		}
-		if err := other.Set(bucket, key, value); err != nil {
-			return err
-		}
-	}
-	return rows.Err()
+	return s.forAll(func(bucket, key, value []byte) error {
+		return other.Set(bucket, key, value)
+	})
 }
 
 func (s *SQLitePersistentState) Data() (any, error) {
-	return nil, nil // FIXME
+	dataMap := make(map[string]map[string]string)
+	if err := s.forAll(func(bucket, key, value []byte) error {
+		bucketMap, ok := dataMap[string(bucket)]
+		if !ok {
+			bucketMap = make(map[string]string)
+			dataMap[string(bucket)] = bucketMap
+		}
+		bucketMap[string(key)] = string(value)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return dataMap, nil
 }
 
 func (s *SQLitePersistentState) Delete(bucket, key []byte) error {
@@ -129,4 +130,21 @@ func (s *SQLitePersistentState) Get(bucket, key []byte) ([]byte, error) {
 func (s *SQLitePersistentState) Set(bucket, key, value []byte) error {
 	_, err := s.db.Exec(setQuery, bucket, key, value)
 	return err
+}
+
+func (s *SQLitePersistentState) forAll(fn func([]byte, []byte, []byte) error) error {
+	rows, err := s.db.Query(dataQuery)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var bucket, key, value []byte
+		if err := rows.Scan(&bucket, &key, &value); err != nil {
+			return err
+		}
+		if err := fn(bucket, key, value); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
 }
