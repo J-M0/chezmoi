@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // Import pure Go SQLite driver
 )
 
 const (
@@ -136,6 +136,7 @@ func (s *SQLitePersistentState) forAll(fn func([]byte, []byte, []byte) error) er
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 	for rows.Next() {
 		var bucket, key, value []byte
 		if err := rows.Scan(&bucket, &key, &value); err != nil {
