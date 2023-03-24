@@ -40,6 +40,15 @@ type SQLitePersistentState struct {
 	db *sql.DB
 }
 
+// NewMockPersistentState returns a new PersistentState.
+func NewMockPersistentState() PersistentState {
+	s, err := NewSQLitePersistentState(":memory:")
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
 func NewSQLitePersistentState(dataSourceName string) (*SQLitePersistentState, error) {
 	db, err := sql.Open("sqlite", dataSourceName)
 	if err != nil {
