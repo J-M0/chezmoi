@@ -67,9 +67,7 @@ func (s *SQLitePersistentState) Close() error {
 }
 
 func (s *SQLitePersistentState) CopyTo(other PersistentState) error {
-	return s.forAll(func(bucket, key, value []byte) error {
-		return other.Set(bucket, key, value)
-	})
+	return s.forAll(other.Set)
 }
 
 func (s *SQLitePersistentState) Data() (any, error) {
