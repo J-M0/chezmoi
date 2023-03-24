@@ -14,6 +14,7 @@ func NewMockPersistentState() *MockPersistentState {
 
 // Close closes s.
 func (s *MockPersistentState) Close() error {
+	*s = MockPersistentState{}
 	return nil
 }
 
