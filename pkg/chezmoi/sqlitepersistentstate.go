@@ -2,8 +2,46 @@ package chezmoi
 
 import (
 	"database/sql"
+	"errors"
 
 	_ "modernc.org/sqlite"
+)
+
+const (
+	createSchemaQuery = `
+		BEGIN TRANSACTION;
+		CREATE TABLE IF NOT EXISTS buckets (
+			id BLOB PRIMARY KEY
+		);
+		CREATE TABLE IF NOT EXISTS pairs (
+			bucket_id BLOB REFERENCES buckets (id) ON DELETE CASCADE,
+			key BLOB NOT NULL,
+			value BLOB NOT NULL,
+			PRIMARY KEY (bucket_id, key)
+		);
+		END TRANSACTION;
+	`
+	dataQuery = `
+		SELECT bucket_id AS bucket, key, value FROM pairs;
+	`
+	deleteQuery = `
+		DELETE FROM pairs WHERE bucket_id = $1 AND key = $2;
+	`
+	deleteBucketQuery = `
+		DELETE FROM buckets WHERE id = $1;
+	`
+	forEachQuery = `
+		SELECT key, value FROM pairs WHERE bucket_id = $1;
+	`
+	getQuery = `
+		SELECT value FROM pairs WHERE bucket_id = $1 AND key = $2;
+	`
+	setQuery = `
+		BEGIN TRANSACTION;
+		INSERT OR IGNORE INTO buckets (id) VALUES ($1);
+		INSERT OR REPLACE INTO pairs (bucket_id, key, value) VALUES ($1, $2, $3);
+		END TRANSACTION;
+	`
 )
 
 type SQLitePersistentState struct {
@@ -15,6 +53,9 @@ func NewSQLitePersistentState(dataSourceName string) (*SQLitePersistentState, er
 	if err != nil {
 		return nil, err
 	}
+	if _, err := db.Exec(createSchemaQuery); err != nil {
+		return nil, err
+	}
 	return &SQLitePersistentState{
 		db: db,
 	}, nil
@@ -24,8 +65,21 @@ func (s *SQLitePersistentState) Close() error {
 	return s.db.Close()
 }
 
-func (s *SQLitePersistentState) CopyTo(_ PersistentState) error {
-	return nil // FIXME
+func (s *SQLitePersistentState) CopyTo(other PersistentState) error {
+	rows, err := s.db.Query(dataQuery)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var bucket, key, value []byte
+		if err := rows.Scan(&bucket, &key, &value); err != nil {
+			return err
+		}
+		if err := other.Set(bucket, key, value); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
 }
 
 func (s *SQLitePersistentState) Data() (any, error) {
@@ -33,21 +87,46 @@ func (s *SQLitePersistentState) Data() (any, error) {
 }
 
 func (s *SQLitePersistentState) Delete(bucket, key []byte) error {
-	return nil // FIXME
+	_, err := s.db.Exec(deleteQuery, bucket, key)
+	return err
 }
 
 func (s *SQLitePersistentState) DeleteBucket(bucket []byte) error {
-	return nil // FIXME
+	_, err := s.db.Exec(deleteBucketQuery, bucket)
+	return err
 }
 
 func (s *SQLitePersistentState) ForEach(bucket []byte, fn func([]byte, []byte) error) error {
-	return nil // FIXME
+	rows, err := s.db.Query(forEachQuery, bucket)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key, value []byte
+		if err := rows.Scan(&key, &value); err != nil {
+			return err
+		}
+		if err := fn(key, value); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
 }
 
 func (s *SQLitePersistentState) Get(bucket, key []byte) ([]byte, error) {
-	return nil, nil // FIXME
+	var value []byte
+	switch err := s.db.QueryRow(getQuery, bucket, key).Scan(&value); {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	default:
+		return value, nil
+	}
 }
 
 func (s *SQLitePersistentState) Set(bucket, key, value []byte) error {
-	return nil // FIXME
+	_, err := s.db.Exec(setQuery, bucket, key, value)
+	return err
 }
