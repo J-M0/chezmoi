@@ -1,5 +1,7 @@
 package chezmoi
 
+// FIXME run the tests here on all persistent state implementations
+
 import (
 	"testing"
 
